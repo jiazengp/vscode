@@ -27,7 +27,7 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 
 	test('renders initial tree', async () => {
 		await timeout(1000);
-		harness.c.addRoot(testStubs.nested(), 'a');
+		harness.c.addItem(testStubs.nested(), 'a');
 		harness.flush(folder1);
 		assert.deepStrictEqual(harness.tree.getRendered(), [
 			{ e: 'aa' }, { e: 'ab' }, { e: 'b' }
@@ -35,9 +35,9 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 	});
 
 	test('updates render if a second folder is added', async () => {
-		harness.c.addRoot(testStubs.nested('id1-'), 'a');
+		harness.c.addItem(testStubs.nested('id1-'), 'a');
 		harness.flush(folder1);
-		harness.c.addRoot(testStubs.nested('id2-'), 'a');
+		harness.c.addItem(testStubs.nested('id2-'), 'a');
 		harness.flush(folder2);
 		assert.deepStrictEqual(harness.flush(folder1), [
 			{ e: 'f1', children: [{ e: 'aa' }, { e: 'ab' }, { e: 'b' }] },
@@ -46,9 +46,9 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 	});
 
 	test('updates render if second folder is removed', async () => {
-		harness.c.addRoot(testStubs.nested('id1-'), 'a');
+		harness.c.addItem(testStubs.nested('id1-'), 'a');
 		harness.flush(folder1);
-		harness.c.addRoot(testStubs.nested('id2-'), 'a');
+		harness.c.addItem(testStubs.nested('id2-'), 'a');
 		harness.flush(folder2);
 		harness.onFolderChange.fire({ added: [], changed: [], removed: [folder1] });
 		assert.deepStrictEqual(harness.flush(folder1), [
@@ -58,9 +58,9 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 
 	test('updates render if second test provider appears', async () => {
 		await timeout(100);
-		harness.c.addRoot(testStubs.nested(), 'a');
+		harness.c.addItem(testStubs.nested(), 'a');
 		harness.flush(folder1);
-		harness.c.addRoot(testStubs.test('root2', undefined, [testStubs.test('c')]), 'b');
+		harness.c.addItem(testStubs.test('root2', undefined, [testStubs.test('c')]), 'b');
 		harness.flush(folder1);
 		await timeout(10);
 		harness.flush(folder1);
@@ -73,7 +73,7 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 
 	test('updates nodes if they add children', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 
 		tests.children.get('id-a')!.addChild(testStubs.test('ac'));
@@ -88,7 +88,7 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 
 	test('updates nodes if they remove children', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 
 		tests.children.get('id-a')!.children.get('id-ab')!.dispose();
@@ -101,7 +101,7 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 
 	test('swaps when node is no longer leaf', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 
 		tests.children.get('id-b')!.addChild(testStubs.test('ba'));
@@ -115,7 +115,7 @@ suite('Workbench - Testing Explorer Hierarchal by Name Projection', () => {
 
 	test('swaps when node is no longer runnable', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 
 		const child = testStubs.test('ba');

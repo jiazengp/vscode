@@ -40,7 +40,7 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 	});
 
 	test('renders initial tree', async () => {
-		harness.c.addRoot(testStubs.nested(), 'a');
+		harness.c.addItem(testStubs.nested(), 'a');
 		harness.flush(folder1);
 		assert.deepStrictEqual(harness.tree.getRendered(), [
 			{ e: 'a' }, { e: 'b' }
@@ -48,7 +48,7 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 	});
 
 	test('expands children', async () => {
-		harness.c.addRoot(testStubs.nested(), 'a');
+		harness.c.addItem(testStubs.nested(), 'a');
 		harness.flush(folder1);
 		harness.tree.expand(harness.projection.getElementByTestId('id-a')!);
 		assert.deepStrictEqual(harness.flush(folder1), [
@@ -57,9 +57,9 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 	});
 
 	test('updates render if a second folder is added', async () => {
-		harness.c.addRoot(testStubs.nested('id1-'), 'a');
+		harness.c.addItem(testStubs.nested('id1-'), 'a');
 		harness.flush(folder1);
-		harness.c.addRoot(testStubs.nested('id2-'), 'a');
+		harness.c.addItem(testStubs.nested('id2-'), 'a');
 		harness.flush(folder2);
 		assert.deepStrictEqual(harness.tree.getRendered(), [
 			{ e: 'f1', children: [{ e: 'a' }, { e: 'b' }] },
@@ -74,9 +74,9 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 	});
 
 	test('updates render if second folder is removed', async () => {
-		harness.c.addRoot(testStubs.nested('id1-'), 'a');
+		harness.c.addItem(testStubs.nested('id1-'), 'a');
 		harness.flush(folder1);
-		harness.c.addRoot(testStubs.nested('id2-'), 'a');
+		harness.c.addItem(testStubs.nested('id2-'), 'a');
 		harness.flush(folder2);
 		harness.onFolderChange.fire({ added: [], changed: [], removed: [folder1] });
 		assert.deepStrictEqual(harness.flush(folder1), [
@@ -85,9 +85,9 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 	});
 
 	test('updates render if second test provider appears', async () => {
-		harness.c.addRoot(testStubs.nested(), 'a');
+		harness.c.addItem(testStubs.nested(), 'a');
 		harness.flush(folder1);
-		harness.c.addRoot(testStubs.test('root2', undefined, [testStubs.test('c')]), 'b');
+		harness.c.addItem(testStubs.test('root2', undefined, [testStubs.test('c')]), 'b');
 		assert.deepStrictEqual(harness.flush(folder1), [
 			{ e: 'root', children: [{ e: 'a' }, { e: 'b' }] },
 			{ e: 'root2', children: [{ e: 'c' }] },
@@ -96,7 +96,7 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 
 	test('updates nodes if they add children', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 		harness.tree.expand(harness.projection.getElementByTestId('id-a')!);
 
@@ -115,7 +115,7 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 
 	test('updates nodes if they remove children', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 		harness.tree.expand(harness.projection.getElementByTestId('id-a')!);
 
@@ -129,7 +129,7 @@ suite('Workbench - Testing Explorer Hierarchal by Location Projection', () => {
 
 	test('applies state changes', async () => {
 		const tests = testStubs.nested();
-		harness.c.addRoot(tests, 'a');
+		harness.c.addItem(tests, 'a');
 		harness.flush(folder1);
 		resultsService.getStateById = () => [undefined, resultInState(TestResultState.Failed)];
 

@@ -23,7 +23,6 @@ import { IConfigurationService } from 'vs/platform/configuration/common/configur
 import { IContextMenuService } from 'vs/platform/contextview/browser/contextView';
 import { IInstantiationService } from 'vs/platform/instantiation/common/instantiation';
 import { IThemeService, themeColorFromId, ThemeIcon } from 'vs/platform/theme/common/themeService';
-import { ExtHostTestingResource } from 'vs/workbench/api/common/extHost.protocol';
 import { TestMessageSeverity, TestResultState } from 'vs/workbench/api/common/extHostTypes';
 import { BREAKPOINT_EDITOR_CONTRIBUTION_ID, IBreakpointEditorContribution } from 'vs/workbench/contrib/debug/common/debug';
 import { testingRunAllIcon, testingRunIcon, testingStatesToIcons } from 'vs/workbench/contrib/testing/browser/icons';
@@ -31,11 +30,11 @@ import { TestingOutputPeekController } from 'vs/workbench/contrib/testing/browse
 import { testMessageSeverityColors } from 'vs/workbench/contrib/testing/browser/theme';
 import { DefaultGutterClickAction, getTestingConfiguration, TestingConfigKeys } from 'vs/workbench/contrib/testing/common/configuration';
 import { labelForTestInState } from 'vs/workbench/contrib/testing/common/constants';
-import { IncrementalTestCollectionItem, InternalTestItem, IRichLocation, ITestMessage, TestDiffOpType, TestResultItem } from 'vs/workbench/contrib/testing/common/testCollection';
+import { identifyTest, IncrementalTestCollectionItem, InternalTestItem, IRichLocation, ITestMessage, TestResultItem } from 'vs/workbench/contrib/testing/common/testCollection';
 import { maxPriority } from 'vs/workbench/contrib/testing/common/testingStates';
 import { buildTestUri, TestUriType } from 'vs/workbench/contrib/testing/common/testingUri';
 import { ITestResultService } from 'vs/workbench/contrib/testing/common/testResultService';
-import { IMainThreadTestCollection, ITestService } from 'vs/workbench/contrib/testing/common/testService';
+import { IMainThreadTestCollection, ITestService, testsInFile } from 'vs/workbench/contrib/testing/common/testService';
 
 function isOriginalInDiffEditor(codeEditorService: ICodeEditorService, codeEditor: ICodeEditor): boolean {
 	const diffEditors = codeEditorService.listDiffEditors();
@@ -122,7 +121,14 @@ export class TestingDecorations extends Disposable implements IEditorContributio
 				this.setDecorations(this.currentUri);
 			}
 		}));
+
 		this._register(Event.any(this.results.onResultsChanged, this.testService.excludeTests.onDidChange)(() => {
+			if (this.currentUri) {
+				this.setDecorations(this.currentUri);
+			}
+		}));
+
+		this._register(this.testService.onDidProcessDiff(() => {
 			if (this.currentUri) {
 				this.setDecorations(this.currentUri);
 			}
@@ -142,26 +148,16 @@ export class TestingDecorations extends Disposable implements IEditorContributio
 			return;
 		}
 
-		this.collection.value = this.testService.subscribeToDiffs(ExtHostTestingResource.TextDocument, uri, diff => {
-			this.setDecorations(uri!);
-
-			for (const op of diff) {
-				switch (op[0]) {
-					case TestDiffOpType.Add:
-						if (!op[1].parent) {
-							this.collection.value?.object.expand(op[1].item.extId, Infinity);
-						}
-						break;
-					case TestDiffOpType.Remove:
-						TestingOutputPeekController.get(this.editor).removeIfPeekingForTest(op[1]);
-						break;
+		(async () => {
+			for await (const _test of testsInFile(this.testService.collection, uri)) {
+				// consume the iterator so that all tests in the file get expanded. Or
+				// at least until the URI changes. If new items are requested, changes
+				// will be trigged in the `onDidProcessDiff` callback.
+				if (this.currentUri !== uri) {
+					break;
 				}
 			}
-		});
-
-		for (const root of this.collection.value.object.rootIds) {
-			this.collection.value.object.expand(root, Infinity);
-		}
+		})();
 
 		this.setDecorations(uri);
 	}
@@ -417,14 +413,14 @@ abstract class RunTestDecoration extends Disposable {
 		if (test.item.runnable) {
 			testActions.push(new Action('testing.gutter.run', localize('run test', 'Run Test'), undefined, undefined, () => this.testService.runTests({
 				debug: false,
-				tests: [{ src: test.src, testId: test.item.extId }],
+				tests: [identifyTest(test)],
 			})));
 		}
 
 		if (test.item.debuggable) {
 			testActions.push(new Action('testing.gutter.debug', localize('debug test', 'Debug Test'), undefined, undefined, () => this.testService.runTests({
 				debug: true,
-				tests: [{ src: test.src, testId: test.item.extId }],
+				tests: [identifyTest(test)],
 			})));
 		}
 
@@ -489,7 +485,7 @@ class MultiRunTestDecoration extends RunTestDecoration implements ITestDecoratio
 		return this.testService.runTests({
 			tests: this.tests
 				.filter(({ test }) => test.item.runnable)
-				.map(({ test }) => ({ testId: test.item.extId, src: test.src })),
+				.map(({ test }) => identifyTest(test)),
 			debug: false,
 		});
 	}
@@ -498,7 +494,7 @@ class MultiRunTestDecoration extends RunTestDecoration implements ITestDecoratio
 		return this.testService.runTests({
 			tests: this.tests
 				.filter(({ test }) => test.item.debuggable)
-				.map(({ test }) => ({ testId: test.item.extId, src: test.src })),
+				.map(({ test }) => identifyTest(test)),
 			debug: true,
 		});
 	}
@@ -535,7 +531,7 @@ class RunSingleTestDecoration extends RunTestDecoration implements ITestDecorati
 		}
 
 		return this.testService.runTests({
-			tests: [{ testId: this.test.item.extId, src: this.test.src }],
+			tests: [identifyTest(this.test)],
 			debug: false,
 		});
 	}
@@ -546,7 +542,7 @@ class RunSingleTestDecoration extends RunTestDecoration implements ITestDecorati
 		}
 
 		return this.testService.runTests({
-			tests: [{ testId: this.test.item.extId, src: this.test.src }],
+			tests: [identifyTest(this.test)],
 			debug: true,
 		});
 	}

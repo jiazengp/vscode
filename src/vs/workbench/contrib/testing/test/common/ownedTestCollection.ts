@@ -4,9 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { Iterable } from 'vs/base/common/iterator';
-import { OwnedTestCollection, SingleUseTestCollection, TestTree } from 'vs/workbench/contrib/testing/common/ownedTestCollection';
+import { SingleUseTestCollection, TestTree } from 'vs/workbench/contrib/testing/common/ownedTestCollection';
 import { TestsDiff } from 'vs/workbench/contrib/testing/common/testCollection';
-import { MainThreadTestCollection } from 'vs/workbench/contrib/testing/common/testServiceImpl';
+import { MainThreadTestCollection } from "vs/workbench/contrib/testing/common/mainThreadTestCollection";
 import { testStubs } from 'vs/workbench/contrib/testing/common/testStubs';
 
 export class TestSingleUseCollection extends SingleUseTestCollection {
@@ -40,7 +40,7 @@ export class TestOwnedTestCollection extends OwnedTestCollection {
 export const getInitializedMainTestCollection = async (root = testStubs.nested()) => {
 	const c = new MainThreadTestCollection(0, async (t, l) => singleUse.expand(t.testId, l));
 	const singleUse = new TestSingleUseCollection({ object: new TestTree(0), dispose: () => undefined });
-	singleUse.addRoot(root, 'provider');
+	singleUse.addItem(root, 'provider');
 	await singleUse.expand('id-root', Infinity);
 	c.apply(singleUse.collectDiff());
 	return c;

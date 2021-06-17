@@ -79,7 +79,7 @@ suite('ExtHost Testing', () => {
 	suite('OwnedTestCollection', () => {
 		test('adds a root recursively', () => {
 			const tests = testStubs.nested();
-			single.addRoot(tests, 'pid');
+			single.addItem(tests, 'pid');
 			single.expand('id-root', Infinity);
 			assert.deepStrictEqual(single.collectDiff(), [
 				[
@@ -119,14 +119,14 @@ suite('ExtHost Testing', () => {
 
 		test('no-ops if items not changed', () => {
 			const tests = testStubs.nested();
-			single.addRoot(tests, 'pid');
+			single.addItem(tests, 'pid');
 			single.collectDiff();
 			assert.deepStrictEqual(single.collectDiff(), []);
 		});
 
 		test('watches property mutations', () => {
 			const tests = testStubs.nested();
-			single.addRoot(tests, 'pid');
+			single.addItem(tests, 'pid');
 			single.expand('id-root', Infinity);
 			single.collectDiff();
 			tests.children.get('id-a')!.description = 'Hello world'; /* item a */
@@ -140,7 +140,7 @@ suite('ExtHost Testing', () => {
 
 		test('removes children', () => {
 			const tests = testStubs.nested();
-			single.addRoot(tests, 'pid');
+			single.addItem(tests, 'pid');
 			single.expand('id-root', Infinity);
 			single.collectDiff();
 			tests.children.get('id-a')!.dispose();
@@ -154,7 +154,7 @@ suite('ExtHost Testing', () => {
 
 		test('adds new children', () => {
 			const tests = testStubs.nested();
-			single.addRoot(tests, 'pid');
+			single.addItem(tests, 'pid');
 			single.expand('id-root', Infinity);
 			single.collectDiff();
 			const child = stubTest('ac');
@@ -425,7 +425,7 @@ suite('ExtHost Testing', () => {
 			debug: false,
 			excludeExtIds: [],
 			runId: 'run-id',
-			tests: [],
+			testIds: [],
 		});
 
 		setup(() => {
