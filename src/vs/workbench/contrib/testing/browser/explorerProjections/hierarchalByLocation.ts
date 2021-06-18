@@ -10,7 +10,7 @@ import { Iterable } from 'vs/base/common/iterator';
 import { Disposable } from 'vs/base/common/lifecycle';
 import { isDefined } from 'vs/base/common/types';
 import { TestResultState } from 'vs/workbench/api/common/extHostTypes';
-import {  ByLocationTestItemElement } from 'vs/workbench/contrib/testing/browser/explorerProjections/hierarchalNodes';
+import { ByLocationTestItemElement } from 'vs/workbench/contrib/testing/browser/explorerProjections/hierarchalNodes';
 import { IActionableTestTreeElement, ITestTreeProjection, TestExplorerTreeElement, TestItemTreeElement, TestTreeErrorMessage } from 'vs/workbench/contrib/testing/browser/explorerProjections/index';
 import { NodeChangeList, NodeRenderDirective, NodeRenderFn, peersHaveChildren } from 'vs/workbench/contrib/testing/browser/explorerProjections/nodeHelper';
 import { IComputedStateAndDurationAccessor, refreshComputedState } from 'vs/workbench/contrib/testing/common/getComputedState';
@@ -29,7 +29,7 @@ const computedStateAccessor: IComputedStateAndDurationAccessor<IActionableTestTr
 
 	getChildren: i => Iterable.filter(
 		i.children.values(),
-	(t): t is TestItemTreeElement => t instanceof TestItemTreeElement,
+		(t): t is TestItemTreeElement => t instanceof TestItemTreeElement,
 	),
 	*getParents(i) {
 		for (let parent = i.parent; parent; parent = parent.parent) {
@@ -137,7 +137,7 @@ export class HierarchicalByLocationProjection extends Disposable implements ITes
 	 * Gets the depth of children to expanded automatically for the node,
 	 */
 	protected getRevealDepth(element: ByLocationTestItemElement): number | undefined {
-		return element.depth === 1 ? 0 : undefined;
+		return element.depth === 0 ? 0 : undefined;
 	}
 
 	/**
@@ -156,7 +156,6 @@ export class HierarchicalByLocationProjection extends Disposable implements ITes
 				case TestDiffOpType.Add: {
 					const item = this.createItem(op[1]);
 					this.storeItem(item);
-					this.changes.addedOrRemoved(item);
 					break;
 				}
 
@@ -216,7 +215,7 @@ export class HierarchicalByLocationProjection extends Disposable implements ITes
 			return;
 		}
 
-		 this.testService.collection.expand(element.test.item.extId, depth);
+		this.testService.collection.expand(element.test.item.extId, depth);
 	}
 
 	protected createItem(item: InternalTestItem): ByLocationTestItemElement {
@@ -234,18 +233,16 @@ export class HierarchicalByLocationProjection extends Disposable implements ITes
 			return { element: node };
 		}
 
-		// Omit the workspace folder or controller root if there are no siblings
-		if (node.depth < 2 && !peersHaveChildren(node, () => this.roots)) {
-			return NodeRenderDirective.Concat;
-		}
+		if (node.depth === 0) {
+			// Omit the test controller root if there are no siblings
+			if (!peersHaveChildren(node, () => this.roots)) {
+				return NodeRenderDirective.Concat;
+			}
 
-		// Omit folders/roots that have no child tests
-		if (node.depth < 2 && node.children.size === 0) {
-			return NodeRenderDirective.Omit;
-		}
-
-		if (!(node instanceof ByLocationTestItemElement)) {
-			return { element: node, children: recurse(node.children) };
+			// Omit roots that have no child tests
+			if (node.children.size === 0) {
+				return NodeRenderDirective.Omit;
+			}
 		}
 
 		return {
@@ -270,6 +267,7 @@ export class HierarchicalByLocationProjection extends Disposable implements ITes
 	protected storeItem(treeElement: ByLocationTestItemElement) {
 		treeElement.parent?.children.add(treeElement);
 		this.items.set(treeElement.test.item.extId, treeElement);
+		this.changes.addedOrRemoved(treeElement);
 
 		const reveal = this.getRevealDepth(treeElement);
 		if (reveal !== undefined) {

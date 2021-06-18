@@ -145,6 +145,8 @@ export class TestTree<T extends InternalTestItem> {
 	}
 }
 
+type ResolveHandler = (item: TestItemRaw, token: CancellationToken) => void;
+
 /**
  * Maintains tests created and registered for a single set of hierarchies
  * for a workspace or document.
@@ -154,8 +156,9 @@ export class SingleUseTestCollection extends Disposable {
 	protected readonly testItemToInternal = new Map<TestItemRaw, OwnedCollectionTestItem>();
 	private readonly debounceSendDiff = this._register(new RunOnceScheduler(() => this.flushDiff(), 200));
 	private readonly diffOpEmitter = this._register(new Emitter<TestsDiff>());
-	public readonly root = new TestItemImpl(`${this.controllerId}Root`, this.controllerId, undefined, );
+	private _resolveHandler?: ResolveHandler;
 
+	public readonly root = new TestItemImpl(`${this.controllerId}Root`, this.controllerId, undefined, undefined, undefined);
 	public readonly tree = new TestTree<OwnedCollectionTestItem>();
 	protected diff: TestsDiff = [];
 
@@ -163,12 +166,18 @@ export class SingleUseTestCollection extends Disposable {
 		private readonly controllerId: string,
 	) {
 		super();
+		this.addItemInner(this.root, null);
 	}
 
 	/**
 	 * Handler used for expanding test items.
 	 */
-	public resolveHandler?: (item: TestItemRaw, token: CancellationToken) => void;
+	public set resolveHandler(handler: undefined | ((item: TestItemRaw, token: CancellationToken) => void)) {
+		this._resolveHandler = handler;
+		for (const test of this.testItemToInternal.values()) {
+			this.updateExpandability(test);
+		}
+	}
 
 	/**
 	 * Fires when an operation happens that should result in a diff.
@@ -177,23 +186,6 @@ export class SingleUseTestCollection extends Disposable {
 
 	public get roots() {
 		return Iterable.filter(this.testItemToInternal.values(), t => t.parent === null);
-	}
-
-	/**
-	 * Adds a new root node to the collection.
-	 */
-	public addItem(item: TestItemRaw) {
-		if (!item.parent) {
-			this.addItemInner(item, null);
-			return;
-		}
-
-		const parent = this.testItemToInternal.get(item.parent);
-		if (!parent) {
-			throw new Error(`Test item has invalid parent ${parent}`);
-		}
-
-		this.addItemInner(item, parent);
 	}
 
 	/**
@@ -329,7 +321,6 @@ export class SingleUseTestCollection extends Disposable {
 		}
 
 		const parentId = parent ? parent.item.extId : null;
-		const expand = this.resolveHandler ? TestItemExpandState.Expandable : TestItemExpandState.NotExpandable;
 		// always expand root node to know if there are tests (and whether to show the welcome view)
 		const pExpandLvls = parent ? parent.expandLevels : 1;
 		const internal: OwnedCollectionTestItem = {
@@ -343,7 +334,10 @@ export class SingleUseTestCollection extends Disposable {
 
 		this.tree.add(internal);
 		this.testItemToInternal.set(actual, internal);
-		this.pushDiff([TestDiffOpType.Add, { parent: parentId, controllerId: this.controllerId, expand, item: internal.item }]);
+		this.pushDiff([
+			TestDiffOpType.Add,
+			{ parent: parentId, controllerId: this.controllerId, expand: internal.expand, item: internal.item },
+		]);
 
 		const api = getPrivateApiFor(actual);
 		api.bus.event(this.onTestItemEvent.bind(this, internal));
@@ -367,7 +361,7 @@ export class SingleUseTestCollection extends Disposable {
 	 */
 	private updateExpandability(internal: OwnedCollectionTestItem) {
 		let newState: TestItemExpandState;
-		if (!this.resolveHandler) {
+		if (!this._resolveHandler) {
 			newState = TestItemExpandState.NotExpandable;
 		} else if (internal.actual.status === TestItemStatus.Pending) {
 			newState = internal.discoverCts
@@ -375,7 +369,9 @@ export class SingleUseTestCollection extends Disposable {
 				: TestItemExpandState.Expandable;
 		} else {
 			internal.initialExpand?.complete();
-			newState = TestItemExpandState.Expanded;
+			newState = internal.actual.children.size > 0
+				? TestItemExpandState.Expanded
+				: TestItemExpandState.NotExpandable;
 		}
 
 		if (newState === internal.expand) {
@@ -417,7 +413,7 @@ export class SingleUseTestCollection extends Disposable {
 			internal.discoverCts.dispose(true);
 		}
 
-		if (!this.resolveHandler) {
+		if (!this._resolveHandler) {
 			const p = new DeferredPromise<void>();
 			p.complete();
 			return p;
@@ -428,7 +424,7 @@ export class SingleUseTestCollection extends Disposable {
 		this.pushExpandStateUpdate(internal);
 
 		internal.initialExpand = new DeferredPromise<void>();
-		this.resolveHandler(internal.actual, internal.discoverCts.token);
+		this._resolveHandler(internal.actual, internal.discoverCts.token);
 
 		return internal.initialExpand;
 	}

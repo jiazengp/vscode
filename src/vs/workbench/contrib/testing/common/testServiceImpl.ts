@@ -184,6 +184,7 @@ export class TestService extends Disposable implements ITestService {
 		this.collection.apply(diff);
 		this.hasDebuggable.set(Iterable.some(this.collection.all, t => t.item.debuggable));
 		this.hasRunnable.set(Iterable.some(this.collection.all, t => t.item.runnable));
+		this.processDiffEmitter.fire(diff);
 	}
 
 	/**

@@ -280,7 +280,7 @@ abstract class RunOrDebugAllTestsAction extends Action2 {
 		const notifications = accessor.get(INotificationService);
 
 		const roots = [...testService.collection.rootItems];
-		if (roots.length) {
+		if (!roots.length) {
 			notifications.info(this.noTestsFoundError);
 			return;
 		}

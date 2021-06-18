@@ -1890,38 +1890,39 @@ declare module 'vscode' {
 	/**
 	 * Interface to discover and execute tests.
 	 */
-	export interface TestController<T> {
+	export interface TestController<T = any> {
 		/**
-		 * Creates a {@link TestRun<T>}. This should be called by the
-		 * {@link TestRunner} when a request is made to execute tests, and may also
-		 * be called if a test run is detected externally. Once created, tests
-		 * that are included in the results will be moved into the
-		 * {@link TestResultState.Pending} state.
+		 * Root test item. Tests in the workspace should be added as children of
+		 * the root. The extension controls when to add these, although the
+		 * editor may request children using the {@link resolveChildrenHandler},
+		 * and the extension should add tests for a file when
+		 * {@link vscode.workspace.onDidOpenTextDocument} fires in order for
+		 * decorations for tests within the file to be visible.
 		 *
-		 * @param request Test run request. Only tests inside the `include` may be
-		 * modified, and tests in its `exclude` are ignored.
-		 * @param name The human-readable name of the run. This can be used to
-		 * disambiguate multiple sets of results in a test run. It is useful if
-		 * tests are run across multiple platforms, for example.
-		 * @param persist Whether the results created by the run should be
-		 * persisted in the editor. This may be false if the results are coming from
-		 * a file already saved externally, such as a coverage information file.
+		 * Tests in this collection should be watched and updated by the extension
+		 * as files change. See  {@link resolveChildrenHandler} for details around
+		 * for the lifecycle of watches.
 		 */
-		createTestRun<T>(request: TestRunRequest<T>, name?: string, persist?: boolean): TestRun<T>;
+		readonly root: TestItem;
 
 		/**
-		 * Starts a test run. When called, the controller should call
-		 * {@link vscode.test.createTestRun}. All tasks associated with the
-		 * run should be created before the function returns or the reutrned
-		 * promise is resolved.
-		 *
-		 * @param request Request information for the test run
-		 * @param cancellationToken Token that signals the used asked to abort the
-		 * test run. If cancellation is requested on this token, all {@link TestRun}
-		 * instances associated with the request will be
-		 * automatically cancelled as well.
+		 * Creates a new managed {@link TestItem} instance as a child of this
+		 * one.
+		 * @param id Unique identifier for the TestItem.
+		 * @param label Human-readable label of the test item.
+		 * @param parent Parent of the item. This is required; top-level items
+		 * should be created as children of the {@link root}.
+		 * @param uri URI this TestItem is associated with. May be a file or directory.
+		 * @param data Custom data to be stored in {@link TestItem.data}
 		 */
-		runHandler?: (request: TestRunRequest<T>, token: CancellationToken) => Thenable<void> | void;
+		createTestItem<TChild = T>(
+			id: string,
+			label: string,
+			parent: TestItem,
+			uri?: Uri,
+			data?: TChild,
+		): TestItem<TChild>;
+
 
 		/**
 		 * A function provided by the extension that the editor may call to request
@@ -1947,6 +1948,37 @@ declare module 'vscode' {
 		 * requested if the test changes before the previous call completes.
 		 */
 		resolveChildrenHandler?: (item: TestItem<T>, token: CancellationToken) => void;
+
+		/**
+		 * Starts a test run. When called, the controller should call
+		 * {@link TestController.createTestRun}. All tasks associated with the
+		 * run should be created before the function returns or the reutrned
+		 * promise is resolved.
+		 *
+		 * @param request Request information for the test run
+		 * @param cancellationToken Token that signals the used asked to abort the
+		 * test run. If cancellation is requested on this token, all {@link TestRun}
+		 * instances associated with the request will be
+		 * automatically cancelled as well.
+		 */
+		runHandler?: (request: TestRunRequest<T>, token: CancellationToken) => Thenable<void> | void;
+		/**
+		 * Creates a {@link TestRun<T>}. This should be called by the
+		 * {@link TestRunner} when a request is made to execute tests, and may also
+		 * be called if a test run is detected externally. Once created, tests
+		 * that are included in the results will be moved into the
+		 * {@link TestResultState.Pending} state.
+		 *
+		 * @param request Test run request. Only tests inside the `include` may be
+		 * modified, and tests in its `exclude` are ignored.
+		 * @param name The human-readable name of the run. This can be used to
+		 * disambiguate multiple sets of results in a test run. It is useful if
+		 * tests are run across multiple platforms, for example.
+		 * @param persist Whether the results created by the run should be
+		 * persisted in the editor. This may be false if the results are coming from
+		 * a file already saved externally, such as a coverage information file.
+		 */
+		createTestRun<T>(request: TestRunRequest<T>, name?: string, persist?: boolean): TestRun<T>;
 
 		/**
 		 * Unregisters the test controller, disposing of its associated tests
@@ -1977,6 +2009,13 @@ declare module 'vscode' {
 		 * Whether tests in this run should be debugged.
 		 */
 		debug: boolean;
+
+		/**
+		 * @param tests Array of specific tests to run.
+		 * @param exclude Tests to exclude from the run
+		 * @param debug Whether tests in this run should be debugged.
+		 */
+		constructor(tests: readonly TestItem<T>[], exclude?: readonly TestItem<T>[], debug?: boolean);
 	}
 
 	/**
@@ -2048,28 +2087,6 @@ declare module 'vscode' {
 		 * The test item may have children who have not been discovered yet.
 		 */
 		Pending = 0,
-	}
-
-	/**
-	 * Options initially passed into `vscode.test.createTestItem`
-	 */
-	export interface TestItemOptions {
-		/**
-		 * Unique identifier for the TestItem. This is used to correlate
-		 * test results and tests in the document with those in the workspace
-		 * (test explorer). This cannot change for the lifetime of the TestItem.
-		 */
-		id: string;
-
-		/**
-		 * URI this TestItem is associated with. May be a file or directory.
-		 */
-		uri?: Uri;
-
-		/**
-		 * Display name describing the test item.
-		 */
-		label: string;
 	}
 
 	/**
@@ -2155,14 +2172,6 @@ declare module 'vscode' {
 		 * or shared outside the extenion who created the item.
 		 */
 		data: T;
-
-		/**
-		 * Creates a new managed {@link TestItem} instance as a child of this
-		 * one.
-		 * @param options Initial/required options for the item
-		 * @param data Custom data to be stored in {@link TestItem.data}
-		 */
-		 createChild<TChild = T>(options: TestItemOptions, data?: TChild): TestItem<TChild>;
 
 		/**
 		 * Marks the test as outdated. This can happen as a result of file changes,

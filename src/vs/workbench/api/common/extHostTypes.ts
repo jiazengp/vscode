@@ -3335,6 +3335,14 @@ const rangeComparator = (a: vscode.Range | undefined, b: vscode.Range | undefine
 	return a.isEqual(b);
 };
 
+export class TestRunRequest<T> implements vscode.TestRunRequest<T> {
+	constructor(
+		public readonly tests: vscode.TestItem<T>[],
+		public readonly exclude?: vscode.TestItem<T>[] | undefined,
+		public readonly debug = false,
+	) { }
+}
+
 export class TestItemImpl<T = any> implements vscode.TestItem<T> {
 	public readonly id!: string;
 	public readonly uri!: vscode.Uri | undefined;
@@ -3397,8 +3405,6 @@ export class TestItemImpl<T = any> implements vscode.TestItem<T> {
 
 	public createChild<TChild>(options: vscode.TestItemOptions, data?: TChild) {
 		const child: TestItemImpl<TChild> = new TestItemImpl<TChild>(options.id, options.label, options.uri, data!, this);
-		const api = getPrivateApiFor(this);
-		api.bus.fire([ExtHostTestItemEventType.NewChild, child]);
 		return child;
 	}
 
